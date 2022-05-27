@@ -2,13 +2,25 @@
 #include <serial/serial.h>
 #include <std_msgs/String.h>
 #include <std_msgs/Empty.h>
+#include <sensor_msgs/Joy.h>
+#include <string>
 
 serial::Serial ser;
+float motor_speed = 0;
+int cmd_speed = 0;
 
 void write_callback(const std_msgs::String::ConstPtr& msg)
 {
     ROS_INFO_STREAM("Writing to serial port" << msg->data);
     ser.write(msg->data);
+}
+
+void JoyCallback(const sensor_msgs::Joy::ConstPtr& msg)
+{
+    //ROS_INFO_STREAM("Acc  : " << msg->axes[2]);
+    cmd_speed = (int)((msg->axes[2] + 1) * 500);
+    if(cmd_speed > 1000) cmd_speed = 1000;
+
 }
 
 int main (int argc, char** argv)
@@ -17,6 +29,7 @@ int main (int argc, char** argv)
     ros::NodeHandle nh;
 
     ros::Subscriber write_sub = nh.subscribe("write", 1000, write_callback);
+    ros::Subscriber joy_sub   = nh.subscribe("/joy",1000, JoyCallback);
     ros::Publisher read_pub = nh.advertise<std_msgs::String>("read", 1000);
 
     try
@@ -42,7 +55,7 @@ int main (int argc, char** argv)
         return -1;
     }
 
-    ros::Rate loop_rate(5);
+    ros::Rate loop_rate(10);
     while(ros::ok())
     {
 
@@ -57,7 +70,10 @@ int main (int argc, char** argv)
             read_pub.publish(result);
         }
 
-    	ser.write("!M 100 0\r");
+	std::string command;
+        command	= "!M " + std::to_string(cmd_speed) + " " + std::to_string(cmd_speed) + "\r";
+	ROS_INFO_STREAM("" << command);
+    	ser.write(command);
         loop_rate.sleep();
 
     }
